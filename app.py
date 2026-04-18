@@ -1,65 +1,76 @@
 import streamlit as st
 import pandas as pd
-import pickle  # Changed from joblib to pickle
+import pickle
 import numpy as np
 import os
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Iris Classifier", page_icon="🌸")
 
-# --- LOAD THE TRAINED MODEL ---
+# --- LOAD MODEL ---
 @st.cache_resource
 def load_model():
-    # Update the path to look for the .pkl file
-    model_path = "iris_model.pkl" 
+    model_path = "iris_model.pkl"
     if os.path.exists(model_path):
-        with open(model_path, 'rb') as file:
-            return pickle.load(file)
+        try:
+            with open(model_path, "rb") as f:
+                return pickle.load(f)
+        except Exception as e:
+            st.error(f"Error loading model: {e}")
+            return None
     else:
-        st.error(f"Model file '{model_path}' not found!")
+        st.error("❌ 'iris_model.pkl' not found. Run train_model.py first.")
         return None
 
 model = load_model()
 
-# --- UI INTERFACE ---
-st.title("🌸 Iris Species Predictor")
-st.markdown("""
-This app uses a **Logistic Regression** model to predict the species of an Iris flower 
-based on its physical measurements.
-""")
+# --- TITLE ---
+st.title("🌸 Iris Flower Classifier")
+st.markdown("Predict Iris species using ML (Logistic Regression + Scaling).")
 
-# Sidebar for user inputs
-st.sidebar.header("Input Floral Features")
+# --- SIDEBAR INPUT ---
+st.sidebar.header("Input Features")
 
-def get_user_input():
-    # Ranges aligned with standard Iris dataset measurements
+def get_input():
     sepal_length = st.sidebar.slider("Sepal Length (cm)", 4.0, 8.0, 5.8)
     sepal_width = st.sidebar.slider("Sepal Width (cm)", 2.0, 4.5, 3.0)
     petal_length = st.sidebar.slider("Petal Length (cm)", 1.0, 7.0, 4.3)
     petal_width = st.sidebar.slider("Petal Width (cm)", 0.1, 2.5, 1.3)
-    
-    features = np.array([[sepal_length, sepal_width, petal_length, petal_width]])
-    return features
 
-input_data = get_user_input()
+    data = np.array([[sepal_length, sepal_width, petal_length, petal_width]])
+    return data
 
-# --- PREDICTION LOGIC ---
+input_data = get_input()
+
+# --- SHOW INPUT ---
+st.write("### 📥 Input Data")
+st.write(pd.DataFrame(input_data, columns=[
+    "Sepal Length", "Sepal Width", "Petal Length", "Petal Width"
+]))
+
+# --- PREDICTION ---
 if model is not None:
-    # Standard labels for the Iris dataset
-    target_names = ['Setosa', 'Versicolor', 'Virginica']
-    
-    if st.button("Predict Species"):
-        prediction = model.predict(input_data)
-        probability = model.predict_proba(input_data)
-        
-        species = target_names[prediction[0]]
-        
-        # Display Results
-        st.success(f"### Result: {species}")
-        
-        # Visualizing probabilities
-        st.write("#### Prediction Probabilities:")
-        prob_df = pd.DataFrame(probability, columns=target_names)
-        st.bar_chart(prob_df.T)
+    target_names = ["Setosa", "Versicolor", "Virginica"]
+
+    if st.button("🔍 Predict"):
+        try:
+            prediction = model.predict(input_data)
+            probability = model.predict_proba(input_data)
+
+            species = target_names[prediction[0]]
+            confidence = np.max(probability)
+
+            # RESULT
+            st.success(f"🌼 Predicted Species: **{species}**")
+            st.info(f"📊 Confidence: {confidence:.2f}")
+
+            # PROBABILITY CHART
+            st.write("### 📊 Prediction Probabilities")
+            prob_df = pd.DataFrame(probability, columns=target_names)
+            st.bar_chart(prob_df.T)
+
+        except Exception as e:
+            st.error(f"Prediction error: {e}")
+
 else:
-    st.warning("Please upload 'iris_model.pkl' to the directory to enable predictions.")
+    st.warning("⚠️ Model not loaded. Please check your model file.")
